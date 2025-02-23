@@ -1,0 +1,70 @@
+version: '3.9'
+services:
+  postgres:
+    image: postgres:16.6
+    environment:
+      - POSTGRES_USER=kaf
+      - POSTGRES_PASSWORD=kaf123
+    volumes:
+      - ./docker-dev:/docker-entrypoint-initdb.d
+      - db_data:/data/postgres
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U kaf']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/gateway/Dockerfile
+    container_name: gateway
+    environment:
+      NODE_ENV: production
+    ports:
+      - '3000:3000'
+    depends_on:
+      - notifications
+      - users
+
+  notifications:
+    build:
+      context: .
+      dockerfile: apps/notifications/Dockerfile
+    container_name: notifications
+    environment:
+      NODE_ENV: production
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: kaf
+      DATABASE_PASSWORD: kaf123
+      DATABASE_NAME: challenge
+    ports:
+      - '3001:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  users:
+    build:
+      context: .
+      dockerfile: apps/users/Dockerfile
+    container_name: users
+    environment:
+      NODE_ENV: production
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: kaf
+      DATABASE_PASSWORD: kaf123
+      DATABASE_NAME: challenge
+    ports:
+      - '3002:3002'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  db_data:
